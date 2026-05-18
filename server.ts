@@ -1,7 +1,7 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -56,27 +56,28 @@ app.post("/api/audit", async (req, res) => {
     // Clean image data string if it has the prefix
     const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: {
-        parts: [
-          { text: "Tolong roast akun Instagram ini berdasarkan screenshot yang saya berikan." },
-          {
-            inlineData: {
-              mimeType: "image/jpeg",
-              data: base64Data,
-            },
-          },
-        ],
-      },
-      config: {
-        systemInstruction: SYSTEM_PROMPT,
-        temperature: 1.0, 
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }, // Minimal latency for fun roasts
+    const model = ai.getGenerativeModel({
+      model: "gemini-2.0-flash-exp", // Menggunakan model yang lebih stabil untuk roasting
+      systemInstruction: SYSTEM_PROMPT,
+      generationConfig: {
+        temperature: 1.0,
       },
     });
 
-    res.json({ result: response.text });
+    const result = await model.generateContent([
+      { text: "Tolong roast akun Instagram ini berdasarkan screenshot yang saya berikan." },
+      {
+        inlineData: {
+          mimeType: "image/jpeg",
+          data: base64Data,
+        },
+      },
+    ]);
+
+    const response = await result.response;
+    const text = response.text();
+
+    res.json({ result: text });
   } catch (error: any) {
     console.error("Audit error:", error);
     res.status(500).json({ error: error.message || "Failed to audit profile" });
