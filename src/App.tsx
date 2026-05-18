@@ -79,7 +79,14 @@ export default function App() {
         body: JSON.stringify({ image }),
       });
 
-      const data = await response.json();
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error("Server lagi ngambek (Error 500/404). Pastikan GEMINI_API_KEY sudah dipasang di Environment Variables Vercel.");
+      }
+
       if (!response.ok) throw new Error(data.error || "Gagal nge-roast");
 
       setResult(data.result);
