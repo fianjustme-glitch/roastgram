@@ -1,0 +1,6 @@
+{
+  "name": "RoastGram AI",
+  "description": "Pakar Audit Instagram & Komedian Stand-up. Siap nge-roast feeds lo sampe gosong tapi tetep berfaedah.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
