@@ -53,11 +53,15 @@ app.post("/api/audit", async (req, res) => {
       return res.status(400).json({ error: "Image is required" });
     }
 
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ error: "GEMINI_API_KEY belum dipasang di Environment Variables!" });
+    }
+
     // Clean image data string if it has the prefix
     const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
 
     const model = ai.getGenerativeModel({
-      model: "gemini-2.0-flash-exp", // Menggunakan model yang lebih stabil untuk roasting
+      model: "gemini-1.5-flash-latest", // Model paling stabil dan cepat
       systemInstruction: SYSTEM_PROMPT,
       generationConfig: {
         temperature: 1.0,
@@ -92,11 +96,14 @@ async function start() {
     });
     app.use(vite.middlewares);
   } else {
+    // Jalani static files di produksi (untuk platform selain Vercel)
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
+    if (require('fs').existsSync(distPath)) {
+      app.use(express.static(distPath));
+      app.get("*", (req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
   }
 
   app.listen(PORT, "0.0.0.0", () => {
