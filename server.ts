@@ -1,6 +1,6 @@
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
+import fs from "fs";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 
@@ -11,15 +11,6 @@ const PORT = 3000;
 
 // Increase limit for image uploads
 app.use(express.json({ limit: '10mb' }));
-
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
-  }
-});
 
 const SYSTEM_PROMPT = `
 Bertindaklah sebagai seorang Instagram Expert sekaligus Komedian Stand-up yang sarkas. Tugasmu adalah melakukan "Rate, Review Jujur, sekaligus Roasting" pada akun Instagram berdasarkan screenshot profil/feeds yang dikirim oleh pengguna.
@@ -47,41 +38,52 @@ Aturan Tambahan:
 
 app.post("/api/audit", async (req, res) => {
   try {
-    const { image } = req.body; // Expecting base64 string without data prefix or with it
+    const { image } = req.body; 
 
     if (!image) {
       return res.status(400).json({ error: "Image is required" });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(500).json({ error: "GEMINI_API_KEY belum dipasang di Environment Variables!" });
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: "GEMINI_API_KEY is missing! Set it in Vercel settings and redeploy." });
     }
+
+    const ai = new GoogleGenAI({ 
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
 
     // Clean image data string if it has the prefix
     const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
 
-    const model = ai.getGenerativeModel({
-      model: "gemini-1.5-flash-latest", // Model paling stabil dan cepat
+    const result = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
       systemInstruction: SYSTEM_PROMPT,
-      generationConfig: {
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: "Tolong roast akun Instagram ini berdasarkan screenshot yang saya berikan." },
+            {
+              inlineData: {
+                mimeType: "image/jpeg",
+                data: base64Data,
+              },
+            },
+          ],
+        },
+      ],
+      config: {
         temperature: 1.0,
       },
     });
 
-    const result = await model.generateContent([
-      { text: "Tolong roast akun Instagram ini berdasarkan screenshot yang saya berikan." },
-      {
-        inlineData: {
-          mimeType: "image/jpeg",
-          data: base64Data,
-        },
-      },
-    ]);
-
-    const response = await result.response;
-    const text = response.text();
-
-    res.json({ result: text });
+    res.json({ result: result.text });
   } catch (error: any) {
     console.error("Audit error:", error);
     res.status(500).json({ error: error.message || "Failed to audit profile" });
@@ -90,6 +92,7 @@ app.post("/api/audit", async (req, res) => {
 
 async function start() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -98,7 +101,7 @@ async function start() {
   } else {
     // Jalani static files di produksi (untuk platform selain Vercel)
     const distPath = path.join(process.cwd(), "dist");
-    if (require('fs').existsSync(distPath)) {
+    if (fs.existsSync(distPath)) {
       app.use(express.static(distPath));
       app.get("*", (req, res) => {
         res.sendFile(path.join(distPath, "index.html"));

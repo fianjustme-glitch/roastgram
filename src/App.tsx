@@ -84,7 +84,8 @@ export default function App() {
       try {
         data = JSON.parse(text);
       } catch (e) {
-        throw new Error("Server lagi ngambek (Error 500/404). Pastikan GEMINI_API_KEY sudah dipasang di Environment Variables Vercel.");
+        console.error("Not JSON response:", text);
+        throw new Error(`Server bermasalah. Response bukan JSON: ${text.substring(0, 100)}... Pastikan Environment Variable GEMINI_API_KEY sudah benar di Vercel.`);
       }
 
       if (!response.ok) throw new Error(data.error || "Gagal nge-roast");
